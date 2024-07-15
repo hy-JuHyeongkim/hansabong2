@@ -1,7 +1,0 @@
-/content/dataset/images/color_1_page_10.png
-/content/dataset/images/page_1.png
-/content/dataset/images/page2_image1.png
-/content/dataset/images/page_9.png
-/content/dataset/images/color_1_page_9.png
-/content/dataset/images/page_13.png
-/content/dataset/images/color_1_page_5.png
