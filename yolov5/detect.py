@@ -65,6 +65,9 @@ from utils.general import (
 )
 from utils.torch_utils import select_device, smart_inference_mode
 
+def create_custom_save_path(base_path, prefix, index):
+    return Path(base_path) / f"{prefix}_{index}.jpg"
+
 
 @smart_inference_mode()
 def run(
@@ -96,6 +99,10 @@ def run(
     half=False,  # use FP16 half-precision inference
     dnn=False,  # use OpenCV DNN for ONNX inference
     vid_stride=1,  # video frame-rate stride
+    custom_save_path=None,
+    custom_name_prefix=None,
+    page_photo_counts=None,
+    start_number=None,
 ):
     """
     Runs YOLOv5 detection inference on various sources like images, videos, directories, streams, etc.
@@ -178,6 +185,9 @@ def run(
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
+    crop_count=start_number
+
+
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(device=device), Profile(device=device), Profile(device=device))
@@ -223,9 +233,12 @@ def run(
                 if not csv_path.is_file():
                     writer.writeheader()
                 writer.writerow(data)
-
+        
         # Process predictions
         for i, det in enumerate(pred):  # per image
+            print("number of detected picture is", len(det))
+            if len(det) != page_photo_counts: sys.exit()
+
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
@@ -270,7 +283,16 @@ def run(
                         label = None if hide_labels else (names[c] if hide_conf else f"{names[c]} {conf:.2f}")
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop:
-                        save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
+                        # 사용자 정의 경로와 이름을 생성
+                        print(custom_save_path)
+                        if custom_save_path and custom_name_prefix:
+                            custom_crop_path = create_custom_save_path(custom_save_path, custom_name_prefix, crop_count)
+                        else:
+                            custom_crop_path = save_dir / "crops" / names[c] / f"{p.stem}_{crop_count}.jpg"
+                        save_one_box(xyxy, imc, file=custom_crop_path, BGR=True)
+                        crop_count += 1
+
+
 
             # Stream results
             im0 = annotator.result()
@@ -386,6 +408,10 @@ def parse_opt():
     parser.add_argument("--half", action="store_true", help="use FP16 half-precision inference")
     parser.add_argument("--dnn", action="store_true", help="use OpenCV DNN for ONNX inference")
     parser.add_argument("--vid-stride", type=int, default=1, help="video frame-rate stride")
+    parser.add_argument("--custom-save-path", type=str, help="custom save path for cropped images")
+    parser.add_argument("--custom-name-prefix", type=str, help="custom name prefix for cropped images")
+    parser.add_argument("--page-photo-counts",type=int, help="expected photo counts for each page")
+    parser.add_argument("--start-number", type=int, help="start number of prefix name's count")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
